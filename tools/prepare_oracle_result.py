@@ -19,10 +19,10 @@ LMDB_MAP_SIZE = 1 << 40
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video", type=str, default="videos/archie.mp4")
-    parser.add_argument("--udf", type=str, default="number_of_cars")
+    parser.add_argument("--video", type=str, default="videos/Car_cam.mp4")
+    parser.add_argument("--udf", type=str, default="monodepth2")
     parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--batch", type=int, default=8)
     opt, _ = parser.parse_known_args()
     print(opt)
 

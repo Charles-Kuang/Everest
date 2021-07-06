@@ -21,9 +21,9 @@ class UDFTester:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video", type=str, default="/mnt/resized_video/archie.mp4")
-    parser.add_argument("--udf", type=str, default="obj_counting")
-    parser.add_argument("--frames", type=str, default="0,37800")
+    parser.add_argument("--video", type=str, default="videos/Car_cam.mp4")
+    parser.add_argument("--udf", type=str, default="monodepth2")
+    parser.add_argument("--frames", type=str, default="50,100")
     parser.add_argument("--output", type=str, default="result")
     opt, _ = parser.parse_known_args()
 
