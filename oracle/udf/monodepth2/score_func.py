@@ -5,7 +5,6 @@ import os
 import io
 import glob
 
-from oracle.udf.monodepth2 import test_simple
 from oracle.udf.base import BaseScoringUDF
 import config
 sys.path.insert(0, os.path.dirname(__file__))
@@ -28,7 +27,8 @@ import numpy as np
 import networks
 from layers import disp_to_depth
 from oracle.udf.monodepth2.utils import download_model_if_doesnt_exist
-from evaluate_depth import STEREO_SCALE_FACTOR
+
+STEREO_SCALE_FACTOR = 5.4
 
 mpl.use('agg')
 
@@ -171,9 +171,9 @@ class Monodepth2(BaseScoringUDF):
                         name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
 
                         
-                        imt = pil_draw.Draw(im)
-                        imt.rectangle([(x1, y1), (x2, y2)], outline="red")
-                        im.save(name_dest_im)
+                        #imt = pil_draw.Draw(im)
+                        #imt.rectangle([(x1, y1), (x2, y2)], outline="red")
+                        #im.save(name_dest_im)
 
                         #print('-> Done!')
                     return_val = STEREO_SCALE_FACTOR * scaled_disp.cpu().numpy()#scaled_disp

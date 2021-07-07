@@ -11,7 +11,7 @@ videos/traffic_footage.mp4
 --max_score
 50
 --udf
-monodepth2
+number_of_cars
 --obj
 car
 --class_thres
