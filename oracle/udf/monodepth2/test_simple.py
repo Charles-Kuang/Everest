@@ -26,52 +26,9 @@ from oracle.udf.monodepth2.layers import disp_to_depth
 from oracle.udf.monodepth2.utils import download_model_if_doesnt_exist
 from oracle.udf.monodepth2.evaluate_depth import STEREO_SCALE_FACTOR
 
-def test_simple(model_name, input_image, pred_metric_depth,  x1, x2, y1, y2, no_cuda=False, count=0):    
-    """Function to predict for a single image or folder of images
-    """
-    assert model_name is not None, \
-        "You must specify the --model_name parameter; see README.md for an example"
-
-    if torch.cuda.is_available() and not no_cuda:
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
-    #if pred_metric_depth and "stereo" not in model_name:
-        #print("Warning: The --pred_metric_depth flag only makes sense for stereo-trained KITTI "
-        #      "models. For mono-trained models, output depths will not in metric space.")
-
-    download_model_if_doesnt_exist(model_name)
-    model_path = os.path.join("oracle/udf/monodepth2/models", model_name)
-    #print("-> Loading model from ", model_path)
-    encoder_path = os.path.join(model_path, "encoder.pth")
-    depth_decoder_path = os.path.join(model_path, "depth.pth")
-
-    # LOADING PRETRAINED MODEL
-    #print("   Loading pretrained encoder")
-    encoder = networks.ResnetEncoder(18, False)
-    loaded_dict_enc = torch.load(encoder_path, map_location=device)
-
-    # extract the height and width of image that this model was trained with
-    feed_height = loaded_dict_enc['height']
-    feed_width = loaded_dict_enc['width']
-    filtered_dict_enc = {k: v for k, v in loaded_dict_enc.items() if k in encoder.state_dict()}
-    encoder.load_state_dict(filtered_dict_enc)
-    encoder.to(device)
-    encoder.eval()
-
-    #print("   Loading pretrained decoder")
-    depth_decoder = networks.DepthDecoder(
-        num_ch_enc=encoder.num_ch_enc, scales=range(4))
-
-    loaded_dict = torch.load(depth_decoder_path, map_location=device)
-    depth_decoder.load_state_dict(loaded_dict)
-
-    depth_decoder.to(device)
-    depth_decoder.eval()
-
-    output_directory = "result/"
-    image_path = "result/" + str(count) + "_disp.jpeg"
+def test_simple(input_image,  x1, x2, y1, y2, count, feed_height, feed_width, device):
+    output_directory = "/everest/result/"
+    image_path = "/everest/result/" + str(count) + "_disp.jpeg"
     output_name = os.path.splitext(os.path.basename(image_path))[0]
 
     # PREDICTING ON EACH IMAGE IN TURN
@@ -101,13 +58,10 @@ def test_simple(model_name, input_image, pred_metric_depth,  x1, x2, y1, y2, no_
 
         # Saving numpy file
         scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
-        if pred_metric_depth:
-            name_dest_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))
-            metric_depth = STEREO_SCALE_FACTOR * depth.cpu().numpy()
-            #np.save(name_dest_npy, metric_depth)
-        else:
-            name_dest_npy = os.path.join(output_directory, "{}_disp.npy".format(output_name))
-            #np.save(name_dest_npy, scaled_disp.cpu().numpy())
+        
+        name_dest_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))
+        metric_depth = STEREO_SCALE_FACTOR * depth.cpu().numpy()
+        #np.save(name_dest_npy, metric_depth)
 
         # Saving colormapped depth image
         disp_resized_np = disp_resized.squeeze().cpu().numpy()

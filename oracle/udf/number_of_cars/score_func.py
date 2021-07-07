@@ -74,7 +74,7 @@ class NumberOfCars(BaseScoringUDF):
                         y1 = int(y1.item())
                         y2 = int(y2.item())
                         cv2.rectangle(visual_img, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                if visual_imgs:
+                #if visual_imgs:
                     visual_imgs.append(Image.fromarray(visual_img))
         if visualize:
             return scores, visual_imgs

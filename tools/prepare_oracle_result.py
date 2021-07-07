@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--video", type=str, default="videos/Car_cam.mp4")
     parser.add_argument("--udf", type=str, default="monodepth2")
     parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument("--batch", type=int, default=8)
+    parser.add_argument("--batch", type=int, default=32)
     opt, _ = parser.parse_known_args()
     print(opt)
 
