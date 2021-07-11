@@ -99,10 +99,9 @@ class Monodepth2(BaseScoringUDF):
         scores = []
         visual_imgs = []
         count = 0
-        pic_num = -1
         for i, boxes in enumerate(detections):
-            pic_num += 1
             max_score = 0
+            x1_m, x2_m, y1_m, y2_m = 0, 0, 0, 0
             if boxes is None:
                 scores.append(0)
                 if visualize:
@@ -110,87 +109,76 @@ class Monodepth2(BaseScoringUDF):
             else:
                 relavant_boxes = [box for box in boxes if int(box[-1]) == self.obj and float(box[4]) >= self.opt.class_thres and float(box[5]) >= self.opt.obj_thres]
                 #if visualize:
-                visual_img = np.copy(imgs[i])
+                input_img = np.copy(imgs[i])
 
+                ###
+                output_directory = "oracle/udf/monodepth2/result/"
+                image_path = "oracle/udf/monodepth2/result/" + str(count) + "_disp.jpeg"
+                output_name = os.path.splitext(os.path.basename(image_path))[0]
+                with torch.no_grad():
+                    # PREDICTING ON EACH IMAGE IN TURN
+                    # Load image and preprocess
+                    processed_img = Image.fromarray(input_img,'RGB')
+
+                    processed_img = processed_img.resize((self.feed_width, self.feed_height), Image.LANCZOS)
+                    processed_img = transforms.ToTensor()(processed_img).unsqueeze(0)
+
+                    # PREDICTION
+                    processed_img = processed_img.to(device)
+                    features = self.encoder(processed_img)
+                    outputs = self.depth_decoder(features)
+
+                    disp = outputs[("disp", 0)]
+                    disp_resized = torch.nn.functional.interpolate(
+                        disp, (480, 854), mode="bilinear", align_corners=False)
+
+                    # Saving numpy file
+                    scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
+                    
+                    name_dest_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))
+                    metric_depth = STEREO_SCALE_FACTOR * depth.cpu().numpy()
+                    #np.save(name_dest_npy, metric_depth)
+
+                    # Saving colormapped depth image
+                    disp_resized_np = disp_resized.squeeze().cpu().numpy()
+                    vmax = np.percentile(disp_resized_np, 95)
+                    normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
+                    mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
+                    colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
+
+                depth = metric_depth[0][0]
+                ###
+                #print(self.feed_height, self.feed_width)
+
+                depth = depth.transpose(1,0)
+                
+                height = input_img.shape[0]
+                width = input_img.shape[1]
+                input_img = cv2.resize(input_img, (854, 480))
                 for x1, y1, x2, y2, conf, cls_conf, cls_pred in relavant_boxes:
                     x1 = int(x1.item())
                     x2 = int(x2.item())
                     y1 = int(y1.item())
                     y2 = int(y2.item())
+                    cv2.rectangle(input_img, (round(x1/width*854), round(y1/height*480)), (round(x2/width*854), round(y2/height*480)), (255, 0, 0), 2)
 
                     #filter out boxes whose center point is far from the lane
-                    height = visual_img.shape[0]
-                    width = visual_img.shape[1]
-                    if not (round((x2+x1)/2) in range(round(width/4), round(3*width/4))):
+                    if round((x2+x1)/2) < round(width/4) or round((x2+x1)/2) > round(3*width/4):
                         continue
                     
-                    ###
-                    output_directory = "oracle/udf/monodepth2/result/"
-                    image_path = "oracle/udf/monodepth2/result/" + str(count) + "_disp.jpeg"
-                    output_name = os.path.splitext(os.path.basename(image_path))[0]
-                    with torch.no_grad():
-                        # PREDICTING ON EACH IMAGE IN TURN
-                        # Load image and preprocess
-                        input_img = Image.fromarray(visual_img,'RGB')
-                        im1 = input_img
-                        name_dest_im1 = os.path.join(output_directory, "{}_disp1.jpeg".format(output_name))
-                        name_dest_im2 = os.path.join(output_directory, "{}_disp2.jpeg".format(output_name))
-                        #imd = pil_draw.Draw(im1)
-                        #imd.rectangle([(x1, y1), (x2, y2)],  outline="red")
-                        #im1.save(name_dest_im1)
-                        #imd.save(name_dest_im2)
-
-                        original_width, original_height = input_img.size
-                        input_img = input_img.resize((self.feed_width, self.feed_height), Image.LANCZOS)
-                        input_img = transforms.ToTensor()(input_img).unsqueeze(0)
-
-                        # PREDICTION
-                        input_img = input_img.to(device)
-                        features = self.encoder(input_img)
-                        outputs = self.depth_decoder(features)
-
-                        disp = outputs[("disp", 0)]
-                        disp_resized = torch.nn.functional.interpolate(
-                            disp, (original_height, original_width), mode="bilinear", align_corners=False)
-
-                        # Saving numpy file
-                        scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
-                        
-                        name_dest_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))
-                        metric_depth = STEREO_SCALE_FACTOR * depth.cpu().numpy()
-                        #np.save(name_dest_npy, metric_depth)
-
-                        # Saving colormapped depth image
-                        disp_resized_np = disp_resized.squeeze().cpu().numpy()
-                        vmax = np.percentile(disp_resized_np, 95)
-                        normalizer = mpl.colors.Normalize(vmin=disp_resized_np.min(), vmax=vmax)
-                        mapper = cm.ScalarMappable(norm=normalizer, cmap='magma')
-                        colormapped_im = (mapper.to_rgba(disp_resized_np)[:, :, :3] * 255).astype(np.uint8)
-                        im = Image.fromarray(colormapped_im)
-
-                        name_dest_im = os.path.join(output_directory, "{}_disp.jpeg".format(output_name))
-
-                        
-                        #imt = pil_draw.Draw(im)
-                        #imt.rectangle([(x1, y1), (x2, y2)], outline="red")
-                        #im.save(name_dest_im)
-
-                        #print('-> Done!')
-                    return_val = STEREO_SCALE_FACTOR * scaled_disp.cpu().numpy()#scaled_disp
-                    depth = metric_depth[0][0]
-                    ###
-                    #print(self.feed_height, self.feed_width)
-
-                    depth = depth.transpose(1,0)
                     average_score = np.mean(100 - depth[round(x1/416*640):round(x2/416*640), round(y1/416*192):round(y2/416*192)])
                     count += 1
                     if max_score < average_score:
                         max_score = average_score
+                        x1_m, x2_m, y1_m, y2_m = x1, x2, y1, y2
 
-                    cv2.rectangle(visual_img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                colormapped_im = cv2.resize(colormapped_im, (854, 480))
+                cv2.rectangle(colormapped_im, (round(x1_m/416*854), round(y1_m/416*480)), (round(x2_m/416*854), round(y2_m/416*480)), (255, 0, 0), 2)
+
                 #scores mainly range from 80-90, to show the difference, for a score like AB.CDEFG,
                 #  transform it to BC
                 scores.append(max(round(max_score * 10 - 800), 0))
+                visual_img = cv2.vconcat([input_img, colormapped_im])
 
             #if visual_imgs:
                 visual_imgs.append(Image.fromarray(visual_img))

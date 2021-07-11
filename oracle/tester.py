@@ -22,8 +22,10 @@ class UDFTester:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", type=str, default="videos/Car_cam.mp4")
+    #parser.add_argument("--video", type=str, default="videos/traffic_footage.mp4")
     parser.add_argument("--udf", type=str, default="monodepth2")
-    parser.add_argument("--frames", type=str, default="0,50,100,150,200,250,300,350,400,450,500,550,600,650,700")
+    #parser.add_argument("--udf", type=str, default="number_of_cars")
+    parser.add_argument("--frames", type=str, default="0,50,100,150,200,250,300,350,400,450,500,550,600,650,675,702")
     parser.add_argument("--output", type=str, default="result")
     opt, _ = parser.parse_known_args()
 
