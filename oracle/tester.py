@@ -39,8 +39,9 @@ if __name__ == "__main__":
     vr = DecordVideoReader(opt.video, udf.get_img_size(), is_torch=False)
 
     frames = [int(f) for f in opt.frames.split(",")]
+    print(frames)
     imgs = vr.get_batch(frames)
-    scores, visual_imgs = udf.get_scores(imgs, True)
+    scores, visual_imgs = udf.get_scores(imgs, frames, True)
     print(scores)
     for frame, visual_img in zip(frames, visual_imgs):
         visual_img.save(os.path.join(opt.output, f"{frame}.jpg"))

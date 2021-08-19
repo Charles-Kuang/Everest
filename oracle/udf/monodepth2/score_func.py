@@ -1,3 +1,12 @@
+'''
+python3 optical_flow.py --inference --model FlowNet2 --save_flow \
+--inference_visualize \
+--inference_dataset ImagesFromFolder \
+--inference_dataset_root ./test \
+--resume FlowNet2.pth.tar \
+--save ./output \
+--create_frames 0
+'''
 from __future__ import absolute_import, division, print_function
 
 import sys
@@ -27,6 +36,8 @@ import numpy as np
 import networks
 from layers import disp_to_depth
 from oracle.udf.monodepth2.utils import download_model_if_doesnt_exist
+
+from pathlib import Path
 
 STEREO_SCALE_FACTOR = 5.4
 
@@ -82,13 +93,25 @@ class Monodepth2(BaseScoringUDF):
 
         self.depth_decoder.to(device)
         self.depth_decoder.eval()
-
-        
     
     def get_img_size(self):
         return (416, 416)
     
-    def get_scores(self, imgs, visualize=False):
+    def get_scores(self, imgs, frames, visualize=False):
+        #generate optical flow file
+        create_frame = '0'
+        if not os.path.exists('./oracle/udf/flownet2/frames/output_01.png'):
+            create_frame = '1'
+        if not os.path.exists('./oracle/udf/flownet2/output/000000.flo'):
+            optical_flow = os.system("python3 ./oracle/udf/flownet2/optical_flow.py --inference --model FlowNet2 --save_flow \
+            --inference_visualize \
+            --inference_dataset ImagesFromFolder \
+            --inference_dataset_root ./frames \
+            --resume ./FlowNet2.pth.tar \
+            --save ./output \
+            --create_frames " + create_frame)
+            print("optical_flow:", optical_flow)
+
         assert (imgs.shape[1], imgs.shape[2]) == self.get_img_size()
         model_imgs = torch.from_numpy(imgs).float().to(self.device)
         model_imgs = model_imgs.permute(0, 3, 1, 2).contiguous().div(255)
@@ -98,7 +121,7 @@ class Monodepth2(BaseScoringUDF):
             detections = non_max_suppression(detections, 0.1, 0.45)
         scores = []
         visual_imgs = []
-        count = 0
+        counts = 0
         for i, boxes in enumerate(detections):
             max_score = 0
             x1_m, x2_m, y1_m, y2_m = 0, 0, 0, 0
@@ -113,9 +136,22 @@ class Monodepth2(BaseScoringUDF):
 
                 ###
                 output_directory = "oracle/udf/monodepth2/result/"
-                image_path = "oracle/udf/monodepth2/result/" + str(count) + "_disp.jpeg"
+                image_path = "oracle/udf/monodepth2/result/" + str(counts) + "_disp.jpeg"
                 output_name = os.path.splitext(os.path.basename(image_path))[0]
                 with torch.no_grad():
+                    #generate optical flow np.array, learned from https://cloud.tencent.com/developer/article/1461933
+                    optical_flow_path = Path('oracle/udf/flownet2/output/' + ("%06d" % frames[i]) + '.flo')
+                    with optical_flow_path.open(mode='r') as flo:
+                        tag = np.fromfile(flo, np.float32, count=1)[0]
+                        optical_width = np.fromfile(flo, np.int32, count=1)[0]
+                        optical_height = np.fromfile(flo, np.int32, count=1)[0]
+                        
+                        #print('tag', tag, 'width', optical_width, 'height', optical_height)
+                        
+                        nbands = 2
+                        tmp = np.fromfile(flo, np.float32, count= nbands * optical_width * optical_height)
+                        flow = np.resize(tmp, (int(optical_height), int(optical_width), int(nbands)))
+
                     # PREDICTING ON EACH IMAGE IN TURN
                     # Load image and preprocess
                     processed_img = Image.fromarray(input_img,'RGB')
@@ -165,23 +201,65 @@ class Monodepth2(BaseScoringUDF):
                     #filter out boxes whose center point is far from the lane
                     if round((x2+x1)/2) < round(width/4) or round((x2+x1)/2) > round(3*width/4):
                         continue
-                    
+
                     average_score = np.mean(100 - depth[round(x1/416*640):round(x2/416*640), round(y1/416*192):round(y2/416*192)])
-                    count += 1
+                    counts += 1
                     if max_score < average_score:
                         max_score = average_score
                         x1_m, x2_m, y1_m, y2_m = x1, x2, y1, y2
 
+                #get central block
                 colormapped_im = cv2.resize(colormapped_im, (854, 480))
                 cv2.rectangle(colormapped_im, (round(x1_m/416*854), round(y1_m/416*480)), (round(x2_m/416*854), round(y2_m/416*480)), (255, 0, 0), 2)
+                #calculate optical flow score
+                flow_x = np.mean(flow[round(x1_m/416*optical_width):round(x2_m/416*optical_width), round(y1_m/416*optical_height):round(y2_m/416*optical_height), 0])
+                flow_y = np.mean(flow[round(x1_m/416*optical_width):round(x2_m/416*optical_width), round(y1_m/416*optical_height):round(y2_m/416*optical_height), 1])
+                
+                flow_x = abs(flow_x) + 1
+                if(np.isnan(flow_x)):
+                    max_score = max_score
+                elif(((x1_m+x2_m)/2 < width / 2 and flow_x < 0) or ((x1_m+x2_m)/2 > width / 2 and flow_x > 0)):#moving away
+                    max_score /= flow_x
+                else:#approaching
+                    max_score *= flow_x
+                    
 
-                #scores mainly range from 80-90, to show the difference, for a score like AB.CDEFG,
+                flow_y = (abs(flow_y) + 1) * 2
+                if(np.isnan(flow_y)):
+                    max_score = max_score
+                if(flow_y >= 0):#moving away
+                    max_score /= flow_y
+                else:#approaching
+                    max_score *= flow_y
+                
+                if(np.isnan(max_score)):
+                    max_score = 0
+
+                """
+                flow_img_path = 'oracle/udf/flownet2/output/' + ("%06d" % frames[i]) + '-vis.png'
+                #handle edge error
+                if(frames[i] == 0):
+                    flow_img_path = 'oracle/udf/flownet2/output/' + ("%06d" % (frames[i]+1)) + '-vis.png'
+                else:
+                    while(not os.path.isfile(flow_img_path)):
+                        frames[i] -= 1
+                        flow_img_path = 'oracle/udf/flownet2/output/' + ("%06d" % (frames[i])) + '-vis.png'
+
+                flow_img = cv2.imread(flow_img_path)
+                print(flow_img.shape, optical_width, optical_height)
+                cv2.rectangle(flow_img, (round(x1_m/416*optical_width), round(y1_m/416*optical_height)), (round(x2_m/416*optical_width), round(y2_m/416*optical_height)), (255, 0, 0), 2)
+                flow_img = Image.fromarray(flow_img)
+                flow_img.save('oracle/udf/flownet2/output/' + ("%06d" % frames[i]) + '-vis_rec.png')
+                """
+
+                #scores range from 0-3000, to show the difference, for a score like AB.CDEFG,
                 #  transform it to BC
-                scores.append(max(round(max_score * 10 - 800), 0))
+                scores.append(max(round(np.sqrt(max_score)), 0))
                 visual_img = cv2.vconcat([input_img, colormapped_im])
 
             #if visual_imgs:
                 visual_imgs.append(Image.fromarray(visual_img))
+        print(scores)
         if visualize:
             return scores, visual_imgs
         else:

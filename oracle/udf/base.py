@@ -14,7 +14,7 @@ class BaseScoringUDF:
         for key, value in args.items():
             self.opt.__dict__[key] = value
 
-    def get_scores(self, imgs, visualize=False):
+    def get_scores(self, imgs, frames, visualize=False):
         return [0] * len(imgs)
     
     def get_img_size(self):

@@ -9,7 +9,7 @@ videos/Car_cam.mp4
 --num_valid
 100
 --max_score
-200
+100
 --udf
 monodepth2
 --obj

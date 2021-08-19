@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--video", type=str, default="videos/Car_cam.mp4")
     parser.add_argument("--udf", type=str, default="monodepth2")
     parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument("--batch", type=int, default=32)
+    parser.add_argument("--batch", type=int, default=8)
     opt, _ = parser.parse_known_args()
     print(opt)
 
@@ -40,6 +40,6 @@ if __name__ == "__main__":
     for batch in tqdm.tqdm(batches, desc="labeling"):
         if len(batch) > 0:
             imgs = vr.get_batch(batch)
-            scores.extend(udf.get_scores(imgs))
+            scores.extend(udf.get_scores(imgs, batch))
     os.makedirs(config.cached_gt_dir, exist_ok=True)
     np.save(output_path, np.array(scores))
