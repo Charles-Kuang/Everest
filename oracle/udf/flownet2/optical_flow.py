@@ -128,7 +128,6 @@ with tools.TimerBlock("Initializing Datasets") as block:
         block.log('Inference Input: {}'.format(' '.join([str([d for d in x.size()]) for x in inference_dataset[0][0]])))
         block.log('Inference Targets: {}'.format(' '.join([str([d for d in x.size()]) for x in inference_dataset[0][1]])))
         inference_loader = DataLoader(inference_dataset, batch_size=args.effective_inference_batch_size, shuffle=False, **inf_gpuargs)
-        print("size:  " , args.effective_inference_batch_size)
 
 # Dynamically load model and loss class with parameters passed in via "--model_[param]=[value]" or "--loss_[param]=[value]" arguments
 with tools.TimerBlock("Building {} model".format(args.model)) as block:

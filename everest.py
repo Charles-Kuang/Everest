@@ -50,8 +50,6 @@ if __name__ == "__main__":
     udf = get_udf_class(opt.udf)()
     vr = DecordVideoReader(opt.video, img_size=config.cmdn_input_size, offset=opt.offset)
     lr = CachedGTLabelReader(cached_gt_path, opt.offset)
-    print("----------------------------", lr)
-    print("----------------------------", len(lr))
     if opt.skip_train_cmdn:
         train_idx = np.load(os.path.join(split_path, "train_idxs.npy"))
         valid_idx = np.load(os.path.join(split_path, "valid_idxs.npy"))
