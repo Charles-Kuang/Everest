@@ -5,7 +5,6 @@ python3 optical_flow.py --inference --model FlowNet2 --save_flow \
 --inference_dataset_root ./test \
 --resume FlowNet2.pth.tar \
 --save ./output \
---create_frames 0
 '''
 from __future__ import absolute_import, division, print_function
 
@@ -13,6 +12,8 @@ import sys
 import os
 import io
 import glob
+
+import subprocess
 
 from oracle.udf.base import BaseScoringUDF
 import config
@@ -99,17 +100,16 @@ class Monodepth2(BaseScoringUDF):
     
     def get_scores(self, imgs, frames, visualize=False):
         #generate optical flow file
-        create_frame = '0'
-        if not os.path.exists('./oracle/udf/flownet2/frames/output_01.png'):
-            create_frame = '1'
+        if not os.path.exists('./oracle/udf/flownet2/output/000001.png'):
+            subprocess.call("ffmpeg -i /mnt/everest/videos/Car_cam.mp4 \
+             /mnt/everest/oracle/udf/flownet2/output/%06d.png", shell=True)
         if not os.path.exists('./oracle/udf/flownet2/output/000000.flo'):
             optical_flow = os.system("python3 ./oracle/udf/flownet2/optical_flow.py --inference --model FlowNet2 --save_flow \
             --inference_visualize \
             --inference_dataset ImagesFromFolder \
-            --inference_dataset_root ./frames \
+            --inference_dataset_root ./output \
             --resume ./FlowNet2.pth.tar \
-            --save ./output \
-            --create_frames " + create_frame)
+            --save ./output")
             print("optical_flow:", optical_flow)
 
         assert (imgs.shape[1], imgs.shape[2]) == self.get_img_size()
@@ -235,7 +235,7 @@ class Monodepth2(BaseScoringUDF):
                 if(np.isnan(max_score)):
                     max_score = 0
 
-                """
+                
                 flow_img_path = 'oracle/udf/flownet2/output/' + ("%06d" % frames[i]) + '-vis.png'
                 #handle edge error
                 if(frames[i] == 0):
@@ -246,11 +246,11 @@ class Monodepth2(BaseScoringUDF):
                         flow_img_path = 'oracle/udf/flownet2/output/' + ("%06d" % (frames[i])) + '-vis.png'
 
                 flow_img = cv2.imread(flow_img_path)
-                print(flow_img.shape, optical_width, optical_height)
+                #print(flow_img.shape, optical_width, optical_height)
                 cv2.rectangle(flow_img, (round(x1_m/416*optical_width), round(y1_m/416*optical_height)), (round(x2_m/416*optical_width), round(y2_m/416*optical_height)), (255, 0, 0), 2)
                 flow_img = Image.fromarray(flow_img)
                 flow_img.save('oracle/udf/flownet2/output/' + ("%06d" % frames[i]) + '-vis_rec.png')
-                """
+                
 
                 #scores range from 0-3000, to show the difference, for a score like AB.CDEFG,
                 #  transform it to BC
@@ -259,7 +259,7 @@ class Monodepth2(BaseScoringUDF):
 
             #if visual_imgs:
                 visual_imgs.append(Image.fromarray(visual_img))
-        print(scores)
+        #print(scores)
         if visualize:
             return scores, visual_imgs
         else:

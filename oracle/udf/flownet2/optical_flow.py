@@ -26,7 +26,6 @@ global param_copy
 print(os.getcwd())
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--create_frames', type=int, default=0)
 
 parser.add_argument('--start_epoch', type=int, default=1)
 parser.add_argument('--total_epochs', type=int, default=50)
@@ -79,10 +78,6 @@ with tools.TimerBlock("Parsing Arguments") as block:
     args = parser.parse_args()
     if args.number_gpus < 0 : args.number_gpus = torch.cuda.device_count()
 
-    #generate frames
-    if args.create_frames == 1:
-        subprocess.call("ffmpeg -i /mnt/everest/videos/Car_cam.mp4 ./frames/output_%02d.png", shell=True)
-
     # Get argument defaults (hastag #thisisahack)
     parser.add_argument('--IGNORE',  action='store_true')
     defaults = vars(parser.parse_args(['--IGNORE']))
@@ -133,6 +128,7 @@ with tools.TimerBlock("Initializing Datasets") as block:
         block.log('Inference Input: {}'.format(' '.join([str([d for d in x.size()]) for x in inference_dataset[0][0]])))
         block.log('Inference Targets: {}'.format(' '.join([str([d for d in x.size()]) for x in inference_dataset[0][1]])))
         inference_loader = DataLoader(inference_dataset, batch_size=args.effective_inference_batch_size, shuffle=False, **inf_gpuargs)
+        print("size:  " , args.effective_inference_batch_size)
 
 # Dynamically load model and loss class with parameters passed in via "--model_[param]=[value]" or "--loss_[param]=[value]" arguments
 with tools.TimerBlock("Building {} model".format(args.model)) as block:

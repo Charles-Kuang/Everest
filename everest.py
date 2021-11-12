@@ -47,11 +47,11 @@ if __name__ == "__main__":
     cached_gt_path = get_cached_gt_path(opt)
     split_path = get_split_path(opt)
     checkpoint_dir = get_checkpoint_dir(opt)
-    print("1")
     udf = get_udf_class(opt.udf)()
     vr = DecordVideoReader(opt.video, img_size=config.cmdn_input_size, offset=opt.offset)
     lr = CachedGTLabelReader(cached_gt_path, opt.offset)
-    print("2")
+    print("----------------------------", lr)
+    print("----------------------------", len(lr))
     if opt.skip_train_cmdn:
         train_idx = np.load(os.path.join(split_path, "train_idxs.npy"))
         valid_idx = np.load(os.path.join(split_path, "valid_idxs.npy"))
